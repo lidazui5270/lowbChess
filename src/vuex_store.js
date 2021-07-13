@@ -76,6 +76,7 @@ const store = new Vuex.Store({
         
         account: "",
         chainId: 0,
+        isWalletInstalled: false,
     },
     mutations: {
         test(state){
@@ -176,6 +177,16 @@ const store = new Vuex.Store({
             state.chainId = id
             console.log("set chain id: ", id)
         },
+        setWalletInstalled (state) {
+          state.isWalletInstalled = true
+        },
+        setBalance (state, payload) {
+          state.bnbBalance = payload.bnbBalance
+          state.lowbBalance = payload.lowbBalance
+          state.lowbMarketBalance = payload.lowbMarketBalance
+          state.approvedBalance = payload.approvedBalance
+          console.log("set balance: ", payload)
+        },
     },
     actions: {
         switchChain () {
@@ -184,8 +195,39 @@ const store = new Vuex.Store({
         updateAccounts () {
             getAccounts ()
         },
+        updateChainId () {
+          getNetworkAndChainId ()
+        },
       }
 });
+
+async function getNetworkAndChainId () {
+  try {
+    const chainId = await ethereum.request({
+      method: 'eth_chainId',
+    })
+    handleNewChain(chainId)
+
+    const networkId = await ethereum.request({
+      method: 'net_version',
+    })
+    console.log("network id", networkId)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+function handleNewChain (chainId) {
+  store.commit('setChainId', chainId)
+  if(chainId == chainInfo.chainId) {
+    if (store.state.account != '') {
+      getBalance(store.state.account)
+      // store.dispatch('updateMyNfts')
+    }
+    // store.dispatch('updateTotalGroup')
+    addLowbToken ()
+  }
+}
 
 async function switchToBinanceSmartChain () {
     console.log('switchToBinanceSmartChain' + chainInfo.chainId)
@@ -226,17 +268,34 @@ function handleNewAccounts (accounts) {
     console.log("store.state.chainId : " + store.state.chainId)
     console.log("chainInfo.chainId : " + chainInfo.chainId)
     if(store.state.chainId == chainInfo.chainId) {
-    //   getBalance(accounts[0])
+      getBalance(accounts[0])
     //   store.dispatch('updateMyNfts')
       addLowbToken ()
     }
+}
+
+async function getBalance (account) {
+  try {
+    const bnbBalance = await global.provider.getBalance(account)
+    const lowbBalance = await global.lowbContract.balanceOf(account)
+    const lowbMarketBalance = await global.marketContract.pendingWithdrawals(account)
+    const approvedBalance = await global.lowbContract.allowance(account, MARKET_CONTRACT_ADDRESS)
+    console.log(' bnbBalance : ' + bnbBalance * 1e-18 + ' lowbBalance : ' + lowbBalance + ' lowbMarketBalance : ' + lowbMarketBalance  + ' approvedBalance : ' + approvedBalance)
+    store.commit('setBalance', {
+      bnbBalance: bnbBalance,
+      lowbBalance: lowbBalance,
+      lowbMarketBalance: lowbMarketBalance,
+      approvedBalance: approvedBalance
+    })
+  } catch (err) {
+    console.error(err)
+  }
 }
 
 async function addLowbToken () {
     if (localStorage.getItem('setLowb') == "true") {
       return
     }
-  
     const tokenAddress = LOWB_TOKEN_ADDRESS
     const tokenSymbol = 'LOWB'
     const tokenDecimals = 18
@@ -267,5 +326,62 @@ async function addLowbToken () {
       console.log(error);
     }
     
+}
+
+const isWalletInstalled = () => {
+  const { ethereum } = window
+  //console.log('MetaMask', ethereum.isMetaMask)
+  return Boolean(ethereum)
+}
+
+async function getContracts (firstTime = true) {
+  const lowbFile = () => import("./assets/ERC20Template.json")
+  const lowbAbi = (await lowbFile())['abi']
+  global.lowbContract = new ethers.Contract(LOWB_TOKEN_ADDRESS, lowbAbi, global.provider)
+
+  const marketFile = () => import("./assets/LowbMarket.json")
+  const marketAbi = (await marketFile())['abi']
+  global.marketContract = new ethers.Contract(MARKET_CONTRACT_ADDRESS, marketAbi, global.provider)
+
+  const helperFile = () => import("./assets/LowbMarketHelper.json")
+  const helperAbi = (await helperFile())['abi']
+  global.helperContract = new ethers.Contract(HELPER_CONTRACT_ADDRESS, helperAbi, global.provider)
+
+  const lowcFile = () => import("./assets/MyCollectible.json")
+  const lowcAbi = (await lowcFile())['abi']
+  global.lowcContract = new ethers.Contract(LOWC_TOKEN_ADDRESS, lowcAbi, global.provider)
+
+  const testFile = () => import("./assets/loserpunk.json")
+  global.loserpunk = (await testFile())
+
+  if (firstTime && store.state.isWalletInstalled) {
+    // update infomation after get contract!!!
+
+    ethereum.autoRefreshOnNetworkChange = false
+    store.dispatch('updateChainId')
+    store.dispatch('updateAccounts')
+
+    //ethereum注册事件
+    ethereum.on('chainChanged', handleNewChain)
+    ethereum.on('accountsChanged', handleNewAccounts)
   }
+  else {
+    handleNewChain(chainInfo.chainId)
+  }
+
+}
+if (isWalletInstalled()) {
+
+  global.provider = new ethers.providers.Web3Provider(window.ethereum)
+  global.signer = global.provider.getSigner()
+  console.log('Access the decentralized web!')
+  store.commit('setWalletInstalled')
+  
+}
+else {
+  global.provider = new ethers.providers.JsonRpcProvider(chainInfo.rpcUrls[0]);
+  //const block = await provider.getBlockNumber()
+  console.log('block', provider.getBlockNumber())
+}
+getContracts()
 export default store;

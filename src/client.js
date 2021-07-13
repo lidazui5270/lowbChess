@@ -94,8 +94,6 @@ function get_nickname(){
 event_bus.$on('create_room',create_room);
 function create_room(room_name=get_nickname()){ // 创建并进入房间
     let roomid = new Date().getTime();
-    vuex.dispatch('switchChain')
-    vuex.dispatch('updateAccounts')
     socket_emit({
         name:'create_room',
         callback(data){
