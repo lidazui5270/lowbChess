@@ -12,6 +12,15 @@
           <el-menu-item index="3">
             <el-button @click="connet_wallet_btn_event" type="primary" icon="plus">连接钱包</el-button>
           </el-menu-item>
+
+          <el-menu-item index="4">
+            <el-button @click="approve_btn_event" type="primary" icon="plus">授权</el-button>
+          </el-menu-item>
+
+          <el-menu-item index="4">
+            <el-button @click="connet_wallet_btn_event" type="primary" icon="plus">存入保证金</el-button>
+          </el-menu-item>
+
           <el-menu-item index="4" class="right">
             <el-tooltip effect="dark" content="点击这里,可以修改昵称" placement="bottom-end">
               <el-button @click="edit_nickname" v-show="input_nickname === 0" type="text">{{nickname}}</el-button>
@@ -76,6 +85,7 @@
         data() {
             return {
                 input_nickname:0,
+                toDeposit: 100,
             }
         },
         mounted(){
@@ -129,6 +139,10 @@
             },
             connet_wallet_btn_event() {
                 client.connetcWallet()
+            },
+            approve_btn_event() {
+              console.log("approve_btn_event deposit : " + this.toDeposit);
+              client.approve(this.toDeposit)
             },
 
         }

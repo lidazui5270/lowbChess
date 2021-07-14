@@ -77,6 +77,7 @@ const store = new Vuex.Store({
         account: "",
         chainId: 0,
         isWalletInstalled: false,
+        eventFilters: [],
     },
     mutations: {
         test(state){
@@ -187,6 +188,10 @@ const store = new Vuex.Store({
           state.approvedBalance = payload.approvedBalance
           console.log("set balance: ", payload)
         },
+        addFilter (state, filter) {
+          state.eventFilters.push(filter)
+          console.log("register new event!")
+        },
     },
     actions: {
         switchChain () {
@@ -198,8 +203,56 @@ const store = new Vuex.Store({
         updateChainId () {
           getNetworkAndChainId ()
         },
+        approve({}, amout) {
+          console.log(" vuex_store.js approve deposit : " + amout);
+          approveLowb(amout)
+        }
       }
 });
+
+//授权lowb
+async function approveLowb(amount) {
+  console.log(" vuex_store.js appapproveLowbrove deposit : " + amount);
+  if (amount > 0) {
+    const lowbWithSigner = global.lowbContract.connect(global.signer);
+    const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+    await lowbWithSigner.approve(MARKET_CONTRACT_ADDRESS, amount_in_wei);
+  }
+
+  const filter = global.lowbContract.filters.Approval(store.state.account, null)
+  if (store.state.eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+    console.log("approve Lowb event registered")
+  }
+  else {
+    store.commit("addFilter", filter)
+    // Receive an event when ANY transfer occurs
+    global.lowbContract.on(filter, async (owner, spender, value, event) => {
+      // The event object contains the verbatim log data, the
+      // EventFragment and functions to fetch the block,
+      // transaction and receipt and event functions
+      console.log(`lowbContract I approved ${ value/1e18 } lowb to ${ spender}`);
+      if (value > 0) {
+        console.log(`I approved ${ value/1e18 } lowb to ${ spender}`);
+        try {
+          const bnbBalance = await global.provider.getBalance(store.state.account)
+          const lowbBalance = store.state.lowbBalance
+          const lowbMarketBalance = store.state.lowbMarketBalance
+          const approvedBalance = value
+          store.commit('setBalance', {
+            bnbBalance: bnbBalance,
+            lowbBalance: lowbBalance,
+            lowbMarketBalance: lowbMarketBalance,
+            approvedBalance: approvedBalance
+          })
+        } 
+        catch (err) {
+          console.error(err)
+        }
+      }
+    });
+  }
+  
+}
 
 async function getNetworkAndChainId () {
   try {
@@ -280,7 +333,7 @@ async function getBalance (account) {
     const lowbBalance = await global.lowbContract.balanceOf(account)
     const lowbMarketBalance = await global.marketContract.pendingWithdrawals(account)
     const approvedBalance = await global.lowbContract.allowance(account, MARKET_CONTRACT_ADDRESS)
-    console.log(' bnbBalance : ' + bnbBalance * 1e-18 + ' lowbBalance : ' + lowbBalance + ' lowbMarketBalance : ' + lowbMarketBalance  + ' approvedBalance : ' + approvedBalance)
+    console.log(' bnbBalance : ' + bnbBalance * 1e-18 + ' lowbBalance : ' + lowbBalance * 1e-18 + ' lowbMarketBalance : ' + lowbMarketBalance  + ' approvedBalance : ' + approvedBalance)
     store.commit('setBalance', {
       bnbBalance: bnbBalance,
       lowbBalance: lowbBalance,
