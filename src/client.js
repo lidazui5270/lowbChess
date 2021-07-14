@@ -265,6 +265,11 @@ function deposit(amout) {
     vuex.dispatch('deposit', amout)
 }
 
+function withdraw(amout) {
+    console.log(" client.js withdraw : " + amout);
+    vuex.dispatch('withdraw', amout)
+}
+
 export default {
     socket,
     create_room,
@@ -277,5 +282,6 @@ export default {
     switchBsc,
     connetcWallet,
     approve,
-    deposit
+    deposit,
+    withdraw
 }

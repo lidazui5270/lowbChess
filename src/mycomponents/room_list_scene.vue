@@ -21,6 +21,10 @@
             <el-button @click="deposit_btn_event" type="primary" icon="plus">存入保证金</el-button>
           </el-menu-item>
 
+          <el-menu-item index="4">
+            <el-button @click="withdraw_btn_event" type="primary" icon="plus">撤回资金</el-button>
+          </el-menu-item>
+
           <el-menu-item index="4" class="right">
             <el-tooltip effect="dark" content="点击这里,可以修改昵称" placement="bottom-end">
               <el-button @click="edit_nickname" v-show="input_nickname === 0" type="text">{{nickname}}</el-button>
@@ -86,6 +90,7 @@
             return {
                 input_nickname:0,
                 toDeposit: 100,
+                toWithdraw: 100,
             }
         },
         mounted(){
@@ -147,6 +152,10 @@
             deposit_btn_event() {
               console.log("deposit_btn_event deposit : " + this.toDeposit);
               client.deposit(this.toDeposit)
+            },
+            withdraw_btn_event() {
+              console.log("withdraw_btn_event toWithdraw : " + this.toWithdraw);
+              client.withdraw(this.toWithdraw)
             },
 
         }

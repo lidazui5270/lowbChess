@@ -210,10 +210,52 @@ const store = new Vuex.Store({
         deposit({}, amout) {
           console.log(" vuex_store.js deposit deposit : " + amout);
           depositLowb(amout)
-        }
+        },
+        withdraw({}, amout) {
+          console.log(" vuex_store.js withdraw : " + amout);
+          withdrawLowb(amout)
+        },
       }
 });
 
+//撤回lowb
+async function withdrawLowb(amount) {
+  if (amount > 0) {
+    const marketWithSigner = global.marketContract.connect(global.signer);
+    const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+    await marketWithSigner.withdraw(amount_in_wei);
+  }
+
+  const filter = global.lowbContract.filters.Transfer(null, store.state.account)
+  if (store.state.eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+    console.log("withdraw Lowb event registered")
+  }
+  else {
+    store.commit("addFilter", filter)
+    // Receive an event when ANY transfer occurs
+    global.lowbContract.on(filter, async (from, to, value, event) => {
+      console.log(`I got ${ value/1e18 } lowb from ${ from}`);
+      // The event object contains the verbatim log data, the
+      // EventFragment and functions to fetch the block,
+      // transaction and receipt and event functions
+      try {
+        const bnbBalance = await global.provider.getBalance(store.state.account)
+        const lowbBalance = Number(store.state.lowbBalance) + Number(value)
+        const lowbMarketBalance = Number(store.state.lowbMarketBalance) - Number(value)
+        const approvedBalance = store.state.approvedBalance
+        store.commit('setBalance', {
+          bnbBalance: bnbBalance,
+          lowbBalance: lowbBalance,
+          lowbMarketBalance: lowbMarketBalance,
+          approvedBalance: approvedBalance
+        })
+        } catch (err) {
+          console.error(err)
+        }
+    });
+  }
+  
+}
 
 //质押lowb
 async function depositLowb(amount) {
