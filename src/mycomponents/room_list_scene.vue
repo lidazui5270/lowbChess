@@ -18,7 +18,7 @@
           </el-menu-item>
 
           <el-menu-item index="4">
-            <el-button @click="connet_wallet_btn_event" type="primary" icon="plus">存入保证金</el-button>
+            <el-button @click="deposit_btn_event" type="primary" icon="plus">存入保证金</el-button>
           </el-menu-item>
 
           <el-menu-item index="4" class="right">
@@ -143,6 +143,10 @@
             approve_btn_event() {
               console.log("approve_btn_event deposit : " + this.toDeposit);
               client.approve(this.toDeposit)
+            },
+            deposit_btn_event() {
+              console.log("deposit_btn_event deposit : " + this.toDeposit);
+              client.deposit(this.toDeposit)
             },
 
         }

@@ -256,8 +256,13 @@ function connetcWallet(){
 }
 
 function approve(amout) {
-    console.log(" client.js approve deposit : " + this.toDeposit);
+    console.log(" client.js approve deposit : " + amout);
     vuex.dispatch('approve', amout)
+}
+
+function deposit(amout) {
+    console.log(" client.js deposit deposit : " + amout);
+    vuex.dispatch('deposit', amout)
 }
 
 export default {
@@ -271,5 +276,6 @@ export default {
     socket_on,
     switchBsc,
     connetcWallet,
-    approve
+    approve,
+    deposit
 }
