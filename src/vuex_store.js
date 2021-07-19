@@ -2,7 +2,7 @@ import Vue from 'vue';
 import Vuex from 'vuex';
 import event_bus from './event_bus';
 import { ethers } from "ethers";
-import { chainInfo, LOWB_TOKEN_ADDRESS, MARKET_CONTRACT_ADDRESS, HELPER_CONTRACT_ADDRESS, LOWC_TOKEN_ADDRESS, ADMIN_ADDRESS } from "./const/const.js"
+import { chainInfo, LOWB_TOKEN_ADDRESS, CHESS_CONTRACT_ADDRESS, HELPER_CONTRACT_ADDRESS, LOWC_TOKEN_ADDRESS, ADMIN_ADDRESS, TEST_USER3_ADDRESS_TEST, TEST_USER4_ADDRESS_TEST, TEST_CHESS_GAME_ID} from "./const/const.js"
 
 // game_status :
 // 0 游戏未开始,处于准备阶段
@@ -184,7 +184,7 @@ const store = new Vuex.Store({
         setBalance (state, payload) {
           state.bnbBalance = payload.bnbBalance
           state.lowbBalance = payload.lowbBalance
-          state.lowbMarketBalance = payload.lowbMarketBalance
+          state.lowbChessBalance = payload.lowbChessBalance
           state.approvedBalance = payload.approvedBalance
           console.log("set balance: ", payload)
         },
@@ -215,13 +215,101 @@ const store = new Vuex.Store({
           console.log(" vuex_store.js withdraw : " + amout);
           withdrawLowb(amout)
         },
+        startGame() {
+          console.log(" vuex_store.js startGame : " + 10);
+          startPlayGame(TEST_USER3_ADDRESS_TEST, TEST_USER4_ADDRESS_TEST, 10);
+        },
+        overGame() {
+          console.log(" vuex_store.js overGame  result : " + 12);
+          playGameOver(TEST_CHESS_GAME_ID, 12)
+        }
       }
 });
+
+//开始游戏
+async function startPlayGame(redPlayer, blackPlayer, amount) {
+  console.log(`startPlayGame amount:  ${ amount/1e18 } lowb redAddress ${ redPlayer}  blackAddress ${ blackPlayer}`);
+  if (amount > 0) {
+    const marketWithSigner = global.chessContract.connect(global.signer);
+    const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+    await marketWithSigner.startPlayGame(redPlayer, blackPlayer, amount_in_wei);
+  }
+
+  const filter = global.chessContract.filters.GameStart(null, null, null, null)
+  if (store.state.eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+    console.log("startPlayGame Lowb event registered")
+  }
+  else {
+    store.commit("addFilter", filter)
+    // Receive an event when ANY transfer occurs
+    global.chessContract.on(filter, async (gameId, value, redAddress, blackAddress, event) => {
+      console.log(`gamestart gameId: ${ gameId} value: ${ value/1e18 } lowb redAddress ${ redAddress}  blackAddress ${ blackAddress}`);
+      // The event object contains the verbatim log data, the
+      // EventFragment and functions to fetch the block,
+      // transaction and receipt and event functions
+      try {
+        const bnbBalance = await global.provider.getBalance(store.state.account)
+        const lowbBalance = Number(store.state.lowbBalance) + Number(value)
+        const lowbChessBalance = Number(store.state.lowbChessBalance) - Number(value)
+        const approvedBalance = store.state.approvedBalance
+        store.commit('setBalance', {
+          bnbBalance: bnbBalance,
+          lowbBalance: lowbBalance,
+          lowbChessBalance: lowbChessBalance,
+          approvedBalance: approvedBalance
+        })
+        } catch (err) {
+          console.error(err)
+        }
+    });
+  }
+  
+}
+
+
+//游戏结束
+async function playGameOver(gameId, gameResult) {
+  console.log(`playGameOver gameId:  ${ gameId } lowb gameResult ${ gameResult} `);
+  if (gameId > 0) {
+    const marketWithSigner = global.chessContract.connect(global.signer);
+    await marketWithSigner.gameOver(gameId, gameResult);
+  }
+
+  const filter = global.chessContract.filters.GameOver(null, null, null, null, null)
+  if (store.state.eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+    console.log("startPlayGame Lowb event registered")
+  }
+  else {
+    store.commit("addFilter", filter)
+    // Receive an event when ANY transfer occurs
+    global.chessContract.on(filter, async (gameId, value, redAddress, blackAddress, gameResult, event) => {
+      console.log(`playGameOver gameId: ${ gameId} value : ${ value/1e18 } lowb redAddress ${ redAddress}  blackAddress ${ blackAddress}  gameResult  ${ gameResult}`);
+      // The event object contains the verbatim log data, the
+      // EventFragment and functions to fetch the block,
+      // transaction and receipt and event functions
+      try {
+        const bnbBalance = await global.provider.getBalance(store.state.account)
+        const lowbBalance = Number(store.state.lowbBalance) + Number(value)
+        const lowbChessBalance = Number(store.state.lowbChessBalance) - Number(value)
+        const approvedBalance = store.state.approvedBalance
+        store.commit('setBalance', {
+          bnbBalance: bnbBalance,
+          lowbBalance: lowbBalance,
+          lowbChessBalance: lowbChessBalance,
+          approvedBalance: approvedBalance
+        })
+        } catch (err) {
+          console.error(err)
+        }
+    });
+  }
+  
+}
 
 //撤回lowb
 async function withdrawLowb(amount) {
   if (amount > 0) {
-    const marketWithSigner = global.marketContract.connect(global.signer);
+    const marketWithSigner = global.chessContract.connect(global.signer);
     const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
     await marketWithSigner.withdraw(amount_in_wei);
   }
@@ -241,12 +329,12 @@ async function withdrawLowb(amount) {
       try {
         const bnbBalance = await global.provider.getBalance(store.state.account)
         const lowbBalance = Number(store.state.lowbBalance) + Number(value)
-        const lowbMarketBalance = Number(store.state.lowbMarketBalance) - Number(value)
+        const lowbChessBalance = Number(store.state.lowbChessBalance) - Number(value)
         const approvedBalance = store.state.approvedBalance
         store.commit('setBalance', {
           bnbBalance: bnbBalance,
           lowbBalance: lowbBalance,
-          lowbMarketBalance: lowbMarketBalance,
+          lowbChessBalance: lowbChessBalance,
           approvedBalance: approvedBalance
         })
         } catch (err) {
@@ -260,7 +348,7 @@ async function withdrawLowb(amount) {
 //质押lowb
 async function depositLowb(amount) {
   if (amount > 0) {
-    const marketWithSigner = global.marketContract.connect(global.signer);
+    const marketWithSigner = global.chessContract.connect(global.signer);
     const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
     await marketWithSigner.deposit(amount_in_wei);
   }
@@ -280,12 +368,12 @@ async function depositLowb(amount) {
       try {
         const bnbBalance = await global.provider.getBalance(store.state.account)
         const lowbBalance = Number(store.state.lowbBalance) - Number(value)
-        const lowbMarketBalance = Number(store.state.lowbMarketBalance) + Number(value)
+        const lowbChessBalance = Number(store.state.lowbChessBalance) + Number(value)
         const approvedBalance = Number(store.state.approvedBalance) - Number(value)
         store.commit('setBalance', {
           bnbBalance: bnbBalance,
           lowbBalance: lowbBalance,
-          lowbMarketBalance: lowbMarketBalance,
+          lowbChessBalance: lowbChessBalance,
           approvedBalance: approvedBalance
         })
         } catch (err) {
@@ -301,7 +389,7 @@ async function approveLowb(amount) {
   if (amount > 0) {
     const lowbWithSigner = global.lowbContract.connect(global.signer);
     const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
-    await lowbWithSigner.approve(MARKET_CONTRACT_ADDRESS, amount_in_wei);
+    await lowbWithSigner.approve(CHESS_CONTRACT_ADDRESS, amount_in_wei);
   }
 
   const filter = global.lowbContract.filters.Approval(store.state.account, null)
@@ -321,12 +409,12 @@ async function approveLowb(amount) {
         try {
           const bnbBalance = await global.provider.getBalance(store.state.account)
           const lowbBalance = store.state.lowbBalance
-          const lowbMarketBalance = store.state.lowbMarketBalance
+          const lowbChessBalance = store.state.lowbChessBalance
           const approvedBalance = value
           store.commit('setBalance', {
             bnbBalance: bnbBalance,
             lowbBalance: lowbBalance,
-            lowbMarketBalance: lowbMarketBalance,
+            lowbChessBalance: lowbChessBalance,
             approvedBalance: approvedBalance
           })
         } 
@@ -416,13 +504,13 @@ async function getBalance (account) {
   try {
     const bnbBalance = await global.provider.getBalance(account)
     const lowbBalance = await global.lowbContract.balanceOf(account)
-    const lowbMarketBalance = await global.marketContract.pendingWithdrawals(account)
-    const approvedBalance = await global.lowbContract.allowance(account, MARKET_CONTRACT_ADDRESS)
-    console.log(' bnbBalance : ' + bnbBalance * 1e-18 + ' lowbBalance : ' + lowbBalance * 1e-18 + ' lowbMarketBalance : ' + lowbMarketBalance  + ' approvedBalance : ' + approvedBalance)
+    const approvedBalance = await global.lowbContract.allowance(account, CHESS_CONTRACT_ADDRESS)
+    const lowbChessBalance = await global.chessContract.pendingWithdrawals(account)
+    console.log(' bnbBalance : ' + bnbBalance * 1e-18 + ' lowbBalance : ' + lowbBalance * 1e-18  + ' lowbChessBalance : ' + lowbChessBalance * 1e-18+ ' approvedBalance : ' + approvedBalance * 1e-18)
     store.commit('setBalance', {
       bnbBalance: bnbBalance,
       lowbBalance: lowbBalance,
-      lowbMarketBalance: lowbMarketBalance,
+      lowbChessBalance: lowbChessBalance,
       approvedBalance: approvedBalance
     })
   } catch (err) {
@@ -477,9 +565,9 @@ async function getContracts (firstTime = true) {
   const lowbAbi = (await lowbFile())['abi']
   global.lowbContract = new ethers.Contract(LOWB_TOKEN_ADDRESS, lowbAbi, global.provider)
 
-  const marketFile = () => import("./assets/LowbMarket.json")
-  const marketAbi = (await marketFile())['abi']
-  global.marketContract = new ethers.Contract(MARKET_CONTRACT_ADDRESS, marketAbi, global.provider)
+  const chessFile = () => import("./assets/ChessContract.json")
+  const chessAbi = (await chessFile())['abi']
+  global.chessContract = new ethers.Contract(CHESS_CONTRACT_ADDRESS, chessAbi, global.provider)
 
   const helperFile = () => import("./assets/LowbMarketHelper.json")
   const helperAbi = (await helperFile())['abi']

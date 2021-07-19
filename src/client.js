@@ -270,6 +270,16 @@ function withdraw(amout) {
     vuex.dispatch('withdraw', amout)
 }
 
+function startGame() {
+    console.log(" client.js startGme ");
+    vuex.dispatch('startGame')
+}
+
+function overGame() {
+    console.log(" client.js overGame ");
+    vuex.dispatch('overGame')
+}
+
 export default {
     socket,
     create_room,
@@ -283,5 +293,7 @@ export default {
     connetcWallet,
     approve,
     deposit,
-    withdraw
+    withdraw,
+    startGame,
+    overGame
 }

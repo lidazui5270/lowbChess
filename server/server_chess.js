@@ -1,3 +1,9 @@
+/**
+ * 棋局状态示意：
+ * 12：红方胜 22：黑方胜
+ * 14：红方答应和棋 24：黑方答应和棋
+ * 15：红方投降 25：黑方投降
+ */
 Array.prototype.remove=function(item){if(item instanceof Array){var item_string=item.toString();for(var i=0,len=this.length;i<len;i++){if(this[i].toString()===item_string){this.splice(i,1);return true}}return false}var index=this.indexOf(item);return index<0?false:this.splice(index,1)};
 Array.prototype.add = function(item){return this.includes(item) ? () => {this.remove(item);this.push(item);} : this.push(item);};
 Array.prototype.toggle = function(item){return this[this.includes(item) ? 'remove' : 'push'](item);};

@@ -25,6 +25,14 @@
             <el-button @click="withdraw_btn_event" type="primary" icon="plus">撤回资金</el-button>
           </el-menu-item>
 
+          <el-menu-item index="4">
+            <el-button @click="startgame_btn_event" type="primary" icon="plus">开始游戏</el-button>
+          </el-menu-item>
+
+          <el-menu-item index="4">
+            <el-button @click="overgame_btn_event" type="primary" icon="plus">结束游戏</el-button>
+          </el-menu-item>
+
           <el-menu-item index="4" class="right">
             <el-tooltip effect="dark" content="点击这里,可以修改昵称" placement="bottom-end">
               <el-button @click="edit_nickname" v-show="input_nickname === 0" type="text">{{nickname}}</el-button>
@@ -157,6 +165,14 @@
               console.log("withdraw_btn_event toWithdraw : " + this.toWithdraw);
               client.withdraw(this.toWithdraw)
             },
+            startgame_btn_event() {
+              console.log("startgame_btn_event ");
+              client.startGame()
+            },
+            overgame_btn_event() {
+              console.log("overgame_btn_event ");
+              client.overGame()
+            }
 
         }
     }
