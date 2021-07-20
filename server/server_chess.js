@@ -4,6 +4,9 @@
  * 14：红方答应和棋 24：黑方答应和棋
  * 15：红方投降 25：黑方投降
  */
+ const  ethers =  require("ethers");
+ var { chainInfo,LOWB_TOKEN_ADDRESS, CHESS_CONTRACT_ADDRESS, ADMIN_ADDRESS, TEST_USER3_ADDRESS_TEST, TEST_USER4_ADDRESS_TEST, TEST_CHESS_GAME_ID} = require("./const.js") 
+
 Array.prototype.remove=function(item){if(item instanceof Array){var item_string=item.toString();for(var i=0,len=this.length;i<len;i++){if(this[i].toString()===item_string){this.splice(i,1);return true}}return false}var index=this.indexOf(item);return index<0?false:this.splice(index,1)};
 Array.prototype.add = function(item){return this.includes(item) ? () => {this.remove(item);this.push(item);} : this.push(item);};
 Array.prototype.toggle = function(item){return this[this.includes(item) ? 'remove' : 'push'](item);};
@@ -35,6 +38,161 @@ function init_piece_pos(){
     }
     return p;
 }
+
+async function getContracts () {
+    const fs = require('fs');
+    let path = require('path');
+    let PUBLIC_PATH = path.resolve(__dirname, './assets/.secret');
+    const privateKey = fs.readFileSync(PUBLIC_PATH).toString().trim();
+    console.log('privateKey : ' + privateKey)
+    global.provider = new ethers.providers.JsonRpcProvider(chainInfo.rpcUrls[0]);
+    global.signer = new ethers.Wallet(privateKey, provider);
+    
+    let balancePromise = global.signer.getBalance();
+    balancePromise.then((balance) => {
+        console.log("balancePromise : " + balance);
+    });
+    console.log('block' + provider.getBlockNumber())
+
+    const lowbFile = () => require("./assets/ERC20Template.json")
+    const lowbAbi = (await lowbFile())['abi']
+    global.lowbContract = new ethers.Contract(LOWB_TOKEN_ADDRESS, lowbAbi, global.provider)
+  
+    const chessFile = () => require("./assets/ChessContract.json")
+    const chessAbi = (await chessFile())['abi']
+    global.chessContract = new ethers.Contract(CHESS_CONTRACT_ADDRESS, chessAbi, global.provider)
+  
+    // startPlayGame(TEST_USER3_ADDRESS_TEST, TEST_USER4_ADDRESS_TEST, 10);
+    approveLowb(200)
+}
+
+var eventFilters = new Array(); 
+
+//开始游戏
+async function startPlayGame(redPlayer, blackPlayer, amount) {
+    console.log(`startPlayGame amount:  ${ amount/1e18 } lowb redAddress ${ redPlayer}  blackAddress ${ blackPlayer}`);
+    if (amount > 0) {
+      const marketWithSigner = global.chessContract.connect(global.signer);
+      const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+      await marketWithSigner.startPlayGame(redPlayer, blackPlayer, amount_in_wei);
+    }
+  
+    const filter = global.chessContract.filters.GameStart(null, null, null, null)
+    if (eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+      console.log("startPlayGame Lowb event registered")
+    }
+    else {
+       eventFilters.push(filter);
+      // Receive an event when ANY transfer occurs
+      global.chessContract.on(filter, async (gameId, value, redAddress, blackAddress, event) => {
+        console.log(`gamestart gameId: ${ gameId} value: ${ value/1e18 } lowb redAddress ${ redAddress}  blackAddress ${ blackAddress}`);
+        // The event object contains the verbatim log data, the
+        // EventFragment and functions to fetch the block,
+        // transaction and receipt and event functions
+        try {
+          const bnbBalance = await global.provider.getBalance(ADMIN_ADDRESS)
+          } catch (err) {
+            console.error(err)
+          }
+      });
+    }
+    
+}
+  
+  
+  //游戏结束
+async function playGameOver(gameId, gameResult) {
+    console.log(`playGameOver gameId:  ${ gameId } lowb gameResult ${ gameResult} `);
+    if (gameId > 0) {
+      const marketWithSigner = global.chessContract.connect(global.signer);
+      await marketWithSigner.gameOver(gameId, gameResult);
+    }
+  
+    const filter = global.chessContract.filters.GameOver(null, null, null, null, null)
+    if (eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+      console.log("startPlayGame Lowb event registered")
+    }
+    else {
+        eventFilters.push(filter);
+      // Receive an event when ANY transfer occurs
+      global.chessContract.on(filter, async (gameId, value, redAddress, blackAddress, gameResult, event) => {
+        console.log(`playGameOver gameId: ${ gameId} value : ${ value/1e18 } lowb redAddress ${ redAddress}  blackAddress ${ blackAddress}  gameResult  ${ gameResult}`);
+        // The event object contains the verbatim log data, the
+        // EventFragment and functions to fetch the block,
+        // transaction and receipt and event functions
+        try {
+          const bnbBalance = await global.provider.getBalance(ADMIN_ADDRESS)
+          } catch (err) {
+            console.error(err)
+          }
+      });
+    }
+    
+}
+
+//质押lowb
+async function depositLowb(amount) {
+    if (amount > 0) {
+      const marketWithSigner = global.chessContract.connect(global.signer);
+      const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+      await marketWithSigner.deposit(amount_in_wei);
+    }
+  
+    const filter = global.lowbContract.filters.Transfer(ADMIN_ADDRESS, null)
+    if (eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+      console.log("deposit Lowb event registered")
+    }
+    else {
+      eventFilters.push(filter);
+      // Receive an event when ANY transfer occurs
+      global.lowbContract.on(filter, async (from, to, value, event) => {
+        console.log(`I sent ${ value/1e18 } lowb to ${ to}`);
+        // The event object contains the verbatim log data, the
+        // EventFragment and functions to fetch the block,
+        // transaction and receipt and event functions
+        try {
+          const bnbBalance = await global.provider.getBalance(ADMIN_ADDRESS)
+          } catch (err) {
+            console.error(err)
+          }
+      });
+    }
+}
+//授权lowb
+async function approveLowb(amount) {
+    console.log(" vuex_store.js appapproveLowbrove deposit : " + amount);
+    if (amount > 0) {
+      const lowbWithSigner = global.lowbContract.connect(global.signer);
+      const amount_in_wei = ethers.utils.parseUnits(amount.toString(), 18);
+      await lowbWithSigner.approve(CHESS_CONTRACT_ADDRESS, amount_in_wei);
+    }
+  
+    const filter = global.lowbContract.filters.Approval(ADMIN_ADDRESS, null)
+    if (eventFilters.find(element => JSON.stringify(element) == JSON.stringify(filter))) {
+      console.log("approve Lowb event registered")
+    }
+    else {
+      eventFilters.push(filter);
+      // Receive an event when ANY transfer occurs
+      global.lowbContract.on(filter, async (owner, spender, value, event) => {
+        // The event object contains the verbatim log data, the
+        // EventFragment and functions to fetch the block,
+        // transaction and receipt and event functions
+        console.log(`lowbContract I approved ${ value/1e18 } lowb to ${ spender}`);
+        if (value > 0) {
+          console.log(`I approved ${ value/1e18 } lowb to ${ spender}`);
+          try {
+            const bnbBalance = await global.provider.getBalance(ADMIN_ADDRESS)
+          } 
+          catch (err) {
+            console.error(err)
+          }
+        }
+      });
+    }
+    
+  }
+getContracts();
 
 var server;
 
